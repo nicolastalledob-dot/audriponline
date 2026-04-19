@@ -10,9 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.49.1",
+    "@supabase/gotrue-js": "^2.103.3",
+    "@supabase/postgrest-js": "^2.103.3",
     "buffer": "^6.0.3",
-    "idb": "^8.0.3",
     "lucide-react": "^0.562.0",
     "music-metadata-browser": "^2.5.10",
     "react": "^18.3.1",

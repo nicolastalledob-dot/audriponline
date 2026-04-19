@@ -8,7 +8,7 @@ import RegionsPlugin from 'wavesurfer.js/dist/plugins/regions.esm.js'
 import { Track, CloudPlaylist, FxPreset as FxPresetType } from '../types'
 import { THEME_PRESETS, ThemeKey } from './SettingsModal'
 import CoverArtCube3D from './CoverArtCube3D'
-import * as db from '../lib/localDb'
+import * as db from '../lib/serverDb'
 const VinylDisc3D = lazy(() => import('./VinylDisc3D'))
 const CD3D = lazy(() => import('./CD3D'))
 
@@ -328,7 +328,7 @@ export default function MusicPlayer({ isActive, initialTracks, onRefreshTracks, 
 
     // --- 3D DISC TRANSITION STATE ---
     const [isVisualReady, setIsVisualReady] = useState(false)
-    const transitionTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+    const transitionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const currentTrackIdRef = useRef<string | null>(null)
     const [frozen3D, setFrozen3D] = useState<{ src: string | null; artist?: string; album?: string; color?: string }>({ src: null })
     const [bgLayer, setBgLayer] = useState<{ a: string | null; b: string | null; active: 'a' | 'b' }>({ a: null, b: null, active: 'a' })

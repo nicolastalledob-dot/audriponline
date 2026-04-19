@@ -4,7 +4,7 @@ import {
     HardDrive, Loader2, FolderOpen
 } from 'lucide-react'
 import type { Track } from '../types'
-import { deleteTrack, updateTrackMetadata, upsertTrack } from '../lib/localDb'
+import { deleteTrack, updateTrackMetadata, upsertTrack } from '../lib/serverDb'
 
 interface FileManagerProps {
     tracks: Track[]

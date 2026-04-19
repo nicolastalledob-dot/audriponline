@@ -57,5 +57,24 @@ export default defineConfig({
         alias: {
             '@': resolve(__dirname, 'src')
         }
-    }
+    },
+    server: {
+        proxy: {
+            '/api/auth': {
+                target: 'http://100.105.130.114:9999',
+                changeOrigin: true,
+                rewrite: (p) => p.replace(/^\/api\/auth/, ''),
+            },
+            '/api/db': {
+                target: 'http://100.105.130.114:3000',
+                changeOrigin: true,
+                rewrite: (p) => p.replace(/^\/api\/db/, ''),
+            },
+            '/api/audio': {
+                target: 'http://100.105.130.114:4000',
+                changeOrigin: true,
+                rewrite: (p) => p.replace(/^\/api\/audio/, ''),
+            },
+        },
+    },
 })

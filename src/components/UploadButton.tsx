@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { Loader2, FolderOpen, FolderPlus } from 'lucide-react'
-import { upsertTrack } from '../lib/localDb'
+import { upsertTrack } from '../lib/serverDb'
 import type { Track } from '../types'
 
 interface UploadButtonProps {

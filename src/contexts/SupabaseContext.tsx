@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
-import { User } from '@supabase/supabase-js'
-import { authClient, onAuthStateChange } from '../lib/auth'
+import type { User } from '@supabase/gotrue-js'
+import { onAuthStateChange, getSession } from '../lib/auth'
+import { api } from '../lib/apiClient'
 
 export interface UserProfile {
     id: string
@@ -23,22 +24,23 @@ export function SupabaseProvider({ children }: { children: ReactNode }) {
 
     const fetchProfile = useCallback(async (userId: string) => {
         try {
-            const { data, error } = await authClient
+            const { data, error } = await api
                 .from('profiles')
                 .select('id, full_name')
                 .eq('id', userId)
-                .single()
+                .maybeSingle()
 
-            if (error && error.code !== 'PGRST116') {
+            if (error) {
                 console.error('Error fetching profile:', error)
                 return
             }
 
             if (data) {
-                setProfile(data)
+                setProfile(data as UserProfile)
             } else {
                 const newProfile: UserProfile = { id: userId, full_name: null }
-                await authClient.from('profiles').insert(newProfile)
+                const { error: insertErr } = await api.from('profiles').insert(newProfile)
+                if (insertErr) console.error('Error creating profile:', insertErr)
                 setProfile(newProfile)
             }
         } catch (err) {
@@ -47,7 +49,7 @@ export function SupabaseProvider({ children }: { children: ReactNode }) {
     }, [])
 
     useEffect(() => {
-        authClient.auth.getSession().then(({ data: { session } }) => {
+        getSession().then(session => {
             const currentUser = session?.user ?? null
             setUser(currentUser)
             if (currentUser) fetchProfile(currentUser.id)
@@ -66,7 +68,7 @@ export function SupabaseProvider({ children }: { children: ReactNode }) {
 
     const updateProfile = useCallback(async (updates: Partial<UserProfile>) => {
         if (!user) return
-        const { error } = await authClient
+        const { error } = await api
             .from('profiles')
             .update(updates)
             .eq('id', user.id)

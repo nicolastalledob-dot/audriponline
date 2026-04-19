@@ -6,7 +6,7 @@ import FileManager from './components/FileManager'
 import AuthScreen from './components/AuthScreen'
 import UploadButton from './components/UploadButton'
 import { SupabaseProvider, useSupabase } from './contexts/SupabaseContext'
-import { getTracks } from './lib/localDb'
+import { getTracks } from './lib/serverDb'
 import { Track } from './types'
 
 const SETTINGS_KEY = 'audrip_settings'
