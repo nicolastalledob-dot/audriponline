@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { Loader2, FolderOpen, FolderPlus } from 'lucide-react'
 import { upsertTrack } from '../lib/serverDb'
+import { generateUuid } from '../lib/uuid'
 import type { Track } from '../types'
 
 interface UploadButtonProps {
@@ -55,7 +56,7 @@ async function importFiles(files: File[], userId: string, onProgress: (current: 
         try {
             const meta = await extractMetadata(file)
             const track = await upsertTrack({
-                id: crypto.randomUUID(),
+                id: generateUuid(),
                 userId,
                 ...meta,
                 fileName: file.name,

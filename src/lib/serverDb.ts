@@ -19,10 +19,15 @@ async function rowToTrack(row: any): Promise<Track> {
     }
 }
 
+// cover_art is excluded — base64 art per row blows up the response (40 MB+
+// at ~500 tracks). MusicPlayer lazy-loads it via getTrackCoverArt for the
+// active track. FileManager shows a placeholder until edited.
+const TRACK_LIST_COLUMNS = 'id,user_id,title,artist,album,duration,file_name,created_at'
+
 export async function getTracks(_userId: string): Promise<Track[]> {
     const { data, error } = await api
         .from('tracks')
-        .select('*')
+        .select(TRACK_LIST_COLUMNS)
         .order('created_at', { ascending: false })
     if (error) throw error
     return Promise.all((data ?? []).map(rowToTrack))

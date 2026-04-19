@@ -9,6 +9,7 @@ import { Track, CloudPlaylist, FxPreset as FxPresetType } from '../types'
 import { THEME_PRESETS, ThemeKey } from './SettingsModal'
 import CoverArtCube3D from './CoverArtCube3D'
 import * as db from '../lib/serverDb'
+import { generateUuid } from '../lib/uuid'
 const VinylDisc3D = lazy(() => import('./VinylDisc3D'))
 const CD3D = lazy(() => import('./CD3D'))
 
@@ -1327,7 +1328,7 @@ export default function MusicPlayer({ isActive, initialTracks, onRefreshTracks, 
                 }
             } else {
                 const saved = await db.savePlaylist({
-                    id: crypto.randomUUID(),
+                    id: generateUuid(),
                     userId,
                     name,
                     description,

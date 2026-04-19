@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import type { Track } from '../types'
 import { deleteTrack, updateTrackMetadata, upsertTrack } from '../lib/serverDb'
+import { generateUuid } from '../lib/uuid'
 
 interface FileManagerProps {
     tracks: Track[]
@@ -89,7 +90,7 @@ export default function FileManager({ tracks, userId, onClose, onRefresh }: File
                 setUploadProgress({ current: i + 1, total: audioFiles.length })
                 try {
                     const meta = await extractMetadata(file)
-                    await upsertTrack({ id: crypto.randomUUID(), userId, ...meta, fileName: file.name, fileBlob: file })
+                    await upsertTrack({ id: generateUuid(), userId, ...meta, fileName: file.name, fileBlob: file })
                 } catch (err) {
                     console.error(`Failed to import ${file.name}:`, err)
                 }
