@@ -12,7 +12,7 @@ import { Track } from './types'
 const SETTINGS_KEY = 'audrip_settings'
 
 function AppContent() {
-    const { user, isLoading } = useSupabase()
+    const { user, profile, isLoading, updateProfile } = useSupabase()
 
     const [showSettings, setShowSettings] = useState(false)
     const [settings, setSettings] = useState<Settings>({
@@ -34,7 +34,11 @@ function AppContent() {
 
     const isAppReady = isSettingsLoaded && isLibraryLoaded
 
-    // Load settings from localStorage
+    const lastServerSettingsRef = useRef<string>('')
+    const settingsSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+    // Initial load: hydrate from localStorage cache for instant first paint.
+    // The server-backed value (from profile) overrides this once it arrives.
     useEffect(() => {
         try {
             const saved = localStorage.getItem(SETTINGS_KEY)
@@ -52,12 +56,41 @@ function AppContent() {
         setIsSettingsLoaded(true)
     }, [])
 
-    // Save settings to localStorage
+    // When the server-side profile arrives, prefer its settings over the
+    // localStorage cache (other devices may have changed them).
     useEffect(() => {
-        if (isSettingsLoaded) {
-            localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings))
-        }
-    }, [settings, isSettingsLoaded])
+        if (!profile) return
+        const serverSettings = profile.settings as Partial<Settings> | undefined
+        if (!serverSettings || Object.keys(serverSettings).length === 0) return
+        const serialized = JSON.stringify(serverSettings)
+        if (serialized === lastServerSettingsRef.current) return
+        lastServerSettingsRef.current = serialized
+        setSettings(prev => {
+            const merged = { ...prev, ...serverSettings }
+            if (merged.surpriseMode) {
+                const themeKeys = Object.keys(THEME_PRESETS) as ThemeKey[]
+                merged.theme = themeKeys[Math.floor(Math.random() * themeKeys.length)]
+                merged.accentColor = '#' + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0')
+            }
+            return merged
+        })
+    }, [profile])
+
+    // On settings change: write through to localStorage immediately, and
+    // debounce the server PATCH so dragging a slider doesn't hammer the API.
+    useEffect(() => {
+        if (!isSettingsLoaded) return
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings))
+        if (!user) return
+        const serialized = JSON.stringify(settings)
+        if (serialized === lastServerSettingsRef.current) return
+        if (settingsSaveTimerRef.current) clearTimeout(settingsSaveTimerRef.current)
+        settingsSaveTimerRef.current = setTimeout(() => {
+            lastServerSettingsRef.current = serialized
+            updateProfile({ settings: settings as unknown as Record<string, unknown> })
+                .catch(err => console.error('Failed to sync settings to server:', err))
+        }, 500)
+    }, [settings, isSettingsLoaded, user, updateProfile])
 
     // Load music library from local IndexedDB
     useEffect(() => {

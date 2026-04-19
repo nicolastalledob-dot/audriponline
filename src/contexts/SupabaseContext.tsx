@@ -6,6 +6,7 @@ import { api } from '../lib/apiClient'
 export interface UserProfile {
     id: string
     full_name: string | null
+    settings: Record<string, unknown>
 }
 
 interface SupabaseContextValue {
@@ -26,7 +27,7 @@ export function SupabaseProvider({ children }: { children: ReactNode }) {
         try {
             const { data, error } = await api
                 .from('profiles')
-                .select('id, full_name')
+                .select('id, full_name, settings')
                 .eq('id', userId)
                 .maybeSingle()
 
@@ -36,9 +37,9 @@ export function SupabaseProvider({ children }: { children: ReactNode }) {
             }
 
             if (data) {
-                setProfile(data as UserProfile)
+                setProfile({ ...data, settings: (data as any).settings ?? {} } as UserProfile)
             } else {
-                const newProfile: UserProfile = { id: userId, full_name: null }
+                const newProfile: UserProfile = { id: userId, full_name: null, settings: {} }
                 const { error: insertErr } = await api.from('profiles').insert(newProfile)
                 if (insertErr) console.error('Error creating profile:', insertErr)
                 setProfile(newProfile)
