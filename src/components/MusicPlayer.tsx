@@ -1689,14 +1689,16 @@ export default function MusicPlayer({ isActive, initialTracks, onRefreshTracks, 
                 doPlay()
             }
             audio.addEventListener('canplay', onCanPlay, { once: true })
-            // Fallback: if canplay doesn't fire within 500ms, try to play anyway
+            // Fallback: if canplay doesn't fire fast (warm cache should be
+            // ~tens of ms), try to play anyway. Smaller window now that the
+            // prefetch hook has typically warmed the cache.
             setTimeout(() => {
                 if (!played) {
                     played = true
                     audio.removeEventListener('canplay', onCanPlay)
                     doPlay()
                 }
-            }, 500)
+            }, 150)
         }
     }, [currentTrackIndex])
 
@@ -1955,21 +1957,31 @@ export default function MusicPlayer({ isActive, initialTracks, onRefreshTracks, 
         } catch { /* setPositionState may throw on stale data */ }
     }, [currentTrack?.id, duration, isPlaying])
 
-    // Prefetch the next track so a lock-screen "next" lands on a warm cache
-    // instead of a fresh fetch. Best-effort: 256 KB Range warms enough for
-    // the audio decoder to start, and getTrackCoverArt populates the in-memory
-    // art cache so MediaSession artwork pops instantly on switch.
+    // Prefetch the next two tracks so a lock-screen "next" — and the next-
+    // next after that — lands on a warm browser cache instead of a fresh
+    // fetch. We pull the whole file (no Range) because the HTTP cache only
+    // serves bytes it's seen; partial responses don't satisfy a later full
+    // GET. Cover art warms via the in-memory cache too.
     useEffect(() => {
         if (!currentTrack || displayTracks.length < 2) return
         const idx = displayTracks.findIndex(t => t.id === currentTrack.id)
         if (idx === -1) return
-        const nextTrack = displayTracks[(idx + 1) % displayTracks.length]
-        if (!nextTrack || nextTrack.id === currentTrack.id) return
+
+        const candidates: Track[] = []
+        for (let offset = 1; offset <= 2; offset++) {
+            const cand = displayTracks[(idx + offset) % displayTracks.length]
+            if (cand && cand.id !== currentTrack.id && !candidates.find(c => c.id === cand.id)) {
+                candidates.push(cand)
+            }
+        }
+        if (candidates.length === 0) return
 
         const timer = setTimeout(() => {
-            fetch(nextTrack.fileUrl, { headers: { Range: 'bytes=0-262143' } }).catch(() => {})
-            db.getTrackCoverArt(nextTrack.id).catch(() => {})
-        }, 1500)
+            for (const t of candidates) {
+                fetch(t.fileUrl, { cache: 'force-cache' as RequestCache }).catch(() => {})
+                db.getTrackCoverArt(t.id).catch(() => {})
+            }
+        }, 300)
 
         return () => clearTimeout(timer)
     }, [currentTrack?.id, displayTracks])
