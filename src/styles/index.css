@@ -143,11 +143,8 @@ body {
   user-select: none;
   touch-action: manipulation;
   overscroll-behavior: none;
-  /* No padding-top — let the player's blurred album-art background bleed
-     all the way up under the Dynamic Island. The status-bar-style is
-     "black-translucent" so the system text stays readable. Per-view
-     padding-top: env(safe-area-inset-top) is added downstream where the
-     content (title, controls) needs to clear the notch. */
+  /* iOS: safe area padding for notch/Dynamic Island */
+  padding-top: env(safe-area-inset-top);
 }
 
 /* Re-enable text selection on inputs */
@@ -3145,9 +3142,7 @@ textarea {
     flex-direction: column;
     align-items: center;
     justify-content: flex-start;
-    /* env() on the top push so the cover-art / title clear the
-       Dynamic Island while the bg-layer underneath still bleeds up. */
-    padding: calc(8px + env(safe-area-inset-top, 0px)) 16px 6px;
+    padding: 8px 16px 6px;
     gap: 6px;
     min-height: 0;
     overflow: hidden;
@@ -6956,9 +6951,7 @@ textarea {
   justify-content: center;
   min-height: 100vh;
   background: var(--bg-primary);
-  /* Add safe-area to padding so the auth card stays clear of the
-     notch (body no longer pushes everything down). */
-  padding: calc(20px + env(safe-area-inset-top, 0px)) 20px 20px;
+  padding: 20px;
   position: relative;
   overflow: hidden;
 }
