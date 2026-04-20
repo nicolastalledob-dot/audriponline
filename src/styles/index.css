@@ -3279,7 +3279,7 @@ textarea {
 
   /* Playlist bottom sheet: clear the footer */
   .playlist-browser {
-    padding-bottom: calc(54px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(56px + min(env(safe-area-inset-bottom, 0px), 12px));
   }
 
   /* Mobile menu button - hidden, replaced by footer nav */
@@ -3295,13 +3295,12 @@ textarea {
     left: 0;
     right: 0;
     z-index: 9999;
-    /* Trust env(safe-area-inset-bottom). Fallback only when the PWA
-       reports 0 explicitly. */
-    height: calc(54px + env(safe-area-inset-bottom, 0px));
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-    /* Match the body background so the safe-area extension is
-       INVISIBLE — what the user sees is just the labels + a hairline
-       top border, not a separate "banner" surface. */
+    /* Reference design wants labels right next to the home indicator,
+       not 34px above it. Use a smaller padding (max 12px) so labels
+       land close to the bottom edge — iOS auto-dims the indicator
+       over content. The total bar stays compact. */
+    height: calc(56px + min(env(safe-area-inset-bottom, 0px), 12px));
+    padding-bottom: min(env(safe-area-inset-bottom, 0px), 12px);
     background: var(--bg-primary);
     border-top: 0.5px solid rgba(255, 255, 255, 0.08);
     justify-content: space-around;
@@ -3426,7 +3425,7 @@ textarea {
 
   .app-main {
     padding-top: 0;
-    padding-bottom: calc(54px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(56px + min(env(safe-area-inset-bottom, 0px), 12px));
     box-sizing: border-box;
   }
 
