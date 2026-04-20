@@ -715,19 +715,40 @@ export default function MusicPlayer({ isActive, initialTracks, onRefreshTracks, 
 
     // No need to fetch cover art for playlist tracks - already in track record
 
-    // Helper: Create Reverb Impulse
+    // Helper: Create a warmer reverb impulse — early reflections (so it
+    // sounds like a space, not a noise burst), one-pole smoothing (rolls
+    // off harsh highs), exponential decay tail. Sounds noticeably less
+    // metallic than raw white noise.
     const createReverbImpulse = (ctx: AudioContext) => {
-        const duration = 2.5
-        const decay = 2.0
+        const duration = 3.0
+        const decay = 2.5
         const sampleRate = ctx.sampleRate
-        const length = sampleRate * duration
+        const length = Math.floor(sampleRate * duration)
         const impulse = ctx.createBuffer(2, length, sampleRate)
-        const left = impulse.getChannelData(0)
-        const right = impulse.getChannelData(1)
-        for (let i = 0; i < length; i++) {
-            const n = i / length
-            left[i] = (Math.random() * 2 - 1) * Math.pow(1 - n, decay)
-            right[i] = (Math.random() * 2 - 1) * Math.pow(1 - n, decay)
+
+        // Same early-reflection pattern on both channels but with random
+        // signs so the stereo image is wide.
+        const earlyTimesMs = [11, 23, 37, 53, 71]
+        const earlyGains = [0.42, 0.32, 0.24, 0.18, 0.12]
+
+        for (let ch = 0; ch < 2; ch++) {
+            const channel = impulse.getChannelData(ch)
+            const smoothing = 0.55
+            let prev = 0
+            for (let i = 0; i < length; i++) {
+                const n = i / length
+                const raw = (Math.random() * 2 - 1) * Math.pow(1 - n, decay)
+                // y[i] = y[i-1] + (1-a) * (x[i] - y[i-1]) — one-pole LP
+                const filtered = prev + (1 - smoothing) * (raw - prev)
+                channel[i] = filtered
+                prev = filtered
+            }
+            for (let r = 0; r < earlyTimesMs.length; r++) {
+                const idx = Math.floor((earlyTimesMs[r] / 1000) * sampleRate)
+                if (idx < length) {
+                    channel[idx] += (Math.random() > 0.5 ? 1 : -1) * earlyGains[r]
+                }
+            }
         }
         return impulse
     }
@@ -817,9 +838,15 @@ export default function MusicPlayer({ isActive, initialTracks, onRefreshTracks, 
         }
         eqFilters[eqFilters.length - 1].connect(ctx.destination)
 
-        // Path B: Reverb
+        // Path B: Reverb — convolver feeds a low-pass to tame harshness,
+        // then the wet gain to destination.
+        const reverbLowpass = ctx.createBiquadFilter()
+        reverbLowpass.type = 'lowpass'
+        reverbLowpass.frequency.value = 5500
+        reverbLowpass.Q.value = 0.7
         hub.connect(reverbConvolver)
-        reverbConvolver.connect(wetGain)
+        reverbConvolver.connect(reverbLowpass)
+        reverbLowpass.connect(wetGain)
         wetGain.connect(ctx.destination)
 
         // Path C: Delay
@@ -853,7 +880,9 @@ export default function MusicPlayer({ isActive, initialTracks, onRefreshTracks, 
         // Apply Initial Values
         bassFilter.gain.value = bassLevel
         dryGain.gain.value = 1
-        wetGain.gain.value = reverbLevel
+        // Slider is 0-3 but treat it as 0-1 internally so full wet doesn't
+        // clip the destination on top of the dry signal.
+        wetGain.gain.value = reverbLevel / 3
         delayWetGain.gain.value = delayLevel
         widthGain.gain.value = stereoWidthLevel
         panner.pan.value = panningLevel
@@ -960,7 +989,7 @@ export default function MusicPlayer({ isActive, initialTracks, onRefreshTracks, 
     // Reverb
     useEffect(() => {
         if (wetGainNodeRef.current && audioContextRef.current) {
-            wetGainNodeRef.current.gain.setTargetAtTime(reverbLevel, audioContextRef.current.currentTime, 0.1)
+            wetGainNodeRef.current.gain.setTargetAtTime(reverbLevel / 3, audioContextRef.current.currentTime, 0.1)
         }
     }, [reverbLevel])
 
@@ -1663,6 +1692,25 @@ export default function MusicPlayer({ isActive, initialTracks, onRefreshTracks, 
 
         // Sync loop attribute for new track
         audio.loop = (repeatMode === 'one')
+
+        // Background-mode handoff: while the page is hidden iOS won't run
+        // the AudioContext, so we play through bgAudio (FX bypassed). When
+        // the user changes tracks from the lock screen, we have to also
+        // point bgAudio at the new file so it doesn't keep playing the old
+        // one. audioRef stays loaded so foreground return is instant.
+        if (bgAudioRef.current) {
+            const bg = bgAudioRef.current
+            bg.src = track.fileUrl
+            bg.preload = 'auto'
+            bg.load()
+            bg.playbackRate = pitchLevel
+            bg.loop = (repeatMode === 'one')
+            if (isPlaying || shouldAutoPlayRef.current) {
+                shouldAutoPlayRef.current = false
+                bg.play().catch(err => console.error('[bgAudio] Play failed:', err))
+            }
+            return
+        }
 
         // Auto-play if triggered by track ending or if already playing
         if (isPlaying || shouldAutoPlayRef.current) {
