@@ -717,29 +717,30 @@ export default function MusicPlayer({ isActive, initialTracks, onRefreshTracks, 
 
     // Helper: Create a warmer reverb impulse — early reflections (so it
     // sounds like a space, not a noise burst), one-pole smoothing (rolls
-    // off harsh highs), exponential decay tail. Sounds noticeably less
-    // metallic than raw white noise. iOS Safari chokes on long convolver
-    // buffers, so we shorten the tail there.
+    // off harsh highs), exponential decay tail.
+    //
+    // iOS budget: stereo input × stereo IR = 4 convolutions per sample
+    // and the iPhone CPU runs out of headroom when pitch is also forcing
+    // realtime resampling. So on iOS we drop to a mono IR (1 conv) and a
+    // shorter tail (~0.6 s). Less spatial reverb but it actually plays.
     const createReverbImpulse = (ctx: AudioContext) => {
-        const duration = isIOS ? 1.6 : 3.0
-        const decay = isIOS ? 2.0 : 2.5
+        const duration = isIOS ? 0.6 : 3.0
+        const decay = isIOS ? 1.8 : 2.5
+        const channels = isIOS ? 1 : 2
         const sampleRate = ctx.sampleRate
         const length = Math.floor(sampleRate * duration)
-        const impulse = ctx.createBuffer(2, length, sampleRate)
+        const impulse = ctx.createBuffer(channels, length, sampleRate)
 
-        // Same early-reflection pattern on both channels but with random
-        // signs so the stereo image is wide.
         const earlyTimesMs = [11, 23, 37, 53, 71]
         const earlyGains = [0.42, 0.32, 0.24, 0.18, 0.12]
 
-        for (let ch = 0; ch < 2; ch++) {
+        for (let ch = 0; ch < channels; ch++) {
             const channel = impulse.getChannelData(ch)
             const smoothing = 0.55
             let prev = 0
             for (let i = 0; i < length; i++) {
                 const n = i / length
                 const raw = (Math.random() * 2 - 1) * Math.pow(1 - n, decay)
-                // y[i] = y[i-1] + (1-a) * (x[i] - y[i-1]) — one-pole LP
                 const filtered = prev + (1 - smoothing) * (raw - prev)
                 channel[i] = filtered
                 prev = filtered
