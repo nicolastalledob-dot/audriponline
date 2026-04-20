@@ -3135,8 +3135,8 @@ textarea {
     flex-direction: column;
     align-items: center;
     justify-content: flex-start;
-    padding: 20px 20px 10px;
-    gap: 10px;
+    padding: 8px 16px 6px;
+    gap: 6px;
     min-height: 0;
     overflow: hidden;
   }
@@ -3144,16 +3144,16 @@ textarea {
   .player-left-side {
     flex: 0 0 auto;
     width: 100%;
-    padding: 10px;
+    padding: 4px;
     display: flex;
     align-items: center;
     justify-content: center;
   }
 
   .now-playing-art-large {
-    max-width: 70vw;
-    max-height: 45vh;
-    min-width: 200px;
+    max-width: 62vw;
+    max-height: 38vh;
+    min-width: 180px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
   }
 
@@ -3288,14 +3288,20 @@ textarea {
     left: 0;
     right: 0;
     z-index: 9999;
-    height: calc(60px + env(safe-area-inset-bottom, 0px));
+    /* iOS standalone PWA sometimes reports safe-area-inset-bottom = 0
+       even when the home indicator is visible. max() guarantees a tiny
+       8px breathing room without bloating the bar on devices that
+       report a real inset. */
+    height: calc(54px + max(env(safe-area-inset-bottom, 0px), 8px));
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
     background: var(--bg-frosted);
-    backdrop-filter: blur(24px) saturate(180%);
-    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
     border-top: 1px solid rgba(var(--overlay-rgb), 0.1);
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.35);
     justify-content: space-around;
     align-items: flex-start;
-    padding-top: 6px;
+    padding-top: 4px;
   }
 
   .mobile-footer-tab {
