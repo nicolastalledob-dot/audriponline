@@ -125,6 +125,13 @@ body {
   overflow: hidden;
 }
 
+/* iOS PWA standalone: position:fixed bottom:0 can stop short of the
+   physical screen edge unless the layout viewport actually covers the
+   full visible area. 100dvh forces the body to fill that. */
+@supports (height: 100dvh) {
+  html, body { height: 100dvh; }
+}
+
 body {
   font-family: var(--font-family);
   background: var(--bg-primary);
@@ -3272,7 +3279,7 @@ textarea {
 
   /* Playlist bottom sheet: clear the footer */
   .playlist-browser {
-    padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(50px + max(env(safe-area-inset-bottom, 0px), 34px));
   }
 
   /* Mobile menu button - hidden, replaced by footer nav */
@@ -3288,21 +3295,21 @@ textarea {
     left: 0;
     right: 0;
     z-index: 9999;
-    /* iOS standalone PWA frequently reports safe-area-inset-bottom = 0
-       even with the home indicator visible. The 24px floor ensures the
-       footer's frosted background reaches past the home indicator zone
-       all the way to the screen edge instead of stopping flush with the
-       last label baseline. */
-    height: calc(54px + max(env(safe-area-inset-bottom, 0px), 24px));
-    padding-bottom: max(env(safe-area-inset-bottom, 0px), 24px);
-    background: var(--bg-frosted);
-    backdrop-filter: blur(28px) saturate(180%);
-    -webkit-backdrop-filter: blur(28px) saturate(180%);
-    border-top: 1px solid rgba(var(--overlay-rgb), 0.1);
-    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.35);
+    /* Floor of 34px guarantees the footer extends past the iPhone home
+       indicator zone (~34px on Pro models) even when iOS standalone PWA
+       reports safe-area-inset-bottom = 0. Box stays compact otherwise. */
+    height: calc(50px + max(env(safe-area-inset-bottom, 0px), 34px));
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 34px);
+    /* Lighter than --bg-primary so the footer is visually a distinct
+       surface instead of blending with the page background. */
+    background: rgba(28, 28, 32, 0.92);
+    backdrop-filter: blur(32px) saturate(180%);
+    -webkit-backdrop-filter: blur(32px) saturate(180%);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 -10px 28px rgba(0, 0, 0, 0.45);
     justify-content: space-around;
     align-items: flex-start;
-    padding-top: 4px;
+    padding-top: 6px;
   }
 
   .mobile-footer-tab {
@@ -3422,7 +3429,7 @@ textarea {
 
   .app-main {
     padding-top: 0;
-    padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(50px + max(env(safe-area-inset-bottom, 0px), 34px));
     box-sizing: border-box;
   }
 
