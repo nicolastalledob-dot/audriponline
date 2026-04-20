@@ -650,7 +650,32 @@ export default function MusicPlayer({ isActive, initialTracks, onRefreshTracks, 
 
     // Analyze album art once — sets both adaptive CSS vars and artColor for 3D model
     useEffect(() => {
-        if (!displayedArt) { setArtColor(null); return }
+        if (!displayedArt) {
+            // No art: derive a deterministic vibrant color from artist+title
+            // so the 3D visualizer isn't a default navy blob for every track
+            // without cover art.
+            const seed = (currentTrack?.artist ?? '') + '|' + (currentTrack?.title ?? '')
+            if (!seed) { setArtColor(null); return }
+            let hash = 0
+            for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) | 0
+            const hue = Math.abs(hash) % 360
+            // HSL → HEX so the existing `color` props (which expect "#rrggbb") work
+            const h = hue / 360, s = 0.62, l = 0.52
+            const c = (1 - Math.abs(2 * l - 1)) * s
+            const x = c * (1 - Math.abs(((h * 6) % 2) - 1))
+            const m = l - c / 2
+            let r1 = 0, g1 = 0, b1 = 0
+            const seg = Math.floor(h * 6)
+            if (seg === 0) { r1 = c; g1 = x }
+            else if (seg === 1) { r1 = x; g1 = c }
+            else if (seg === 2) { g1 = c; b1 = x }
+            else if (seg === 3) { g1 = x; b1 = c }
+            else if (seg === 4) { r1 = x; b1 = c }
+            else { r1 = c; b1 = x }
+            const toHex = (v: number) => Math.round((v + m) * 255).toString(16).padStart(2, '0')
+            setArtColor('#' + toHex(r1) + toHex(g1) + toHex(b1))
+            return
+        }
 
         let cancelled = false
         analyzeAlbumArt(displayedArt).then(result => {

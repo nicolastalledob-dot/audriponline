@@ -7,9 +7,12 @@
   <meta http-equiv="Content-Security-Policy"
     content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; media-src 'self' https://*.supabase.co data: blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co blob:;">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="AudRip">
-  <meta name="theme-color" content="#000000">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: light)">
+  <meta name="format-detection" content="telephone=no">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
   <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512x512.png">
