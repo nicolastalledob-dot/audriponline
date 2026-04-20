@@ -1019,18 +1019,28 @@ export default function MusicPlayer({ isActive, initialTracks, onRefreshTracks, 
         }
     }, [reverbLevel])
 
+    // iOS Safari clamps audio.playbackRate to ~0.5–2.0; values outside
+    // that produce silence. Squash the slider value into the safe range
+    // for iOS while keeping the desktop range wide.
+    const effectivePitch = isIOS
+        ? Math.max(0.5, Math.min(2.0, pitchLevel))
+        : pitchLevel
+
     // Pitch
     useEffect(() => {
-        if (audioRef.current) {
-            audioRef.current.playbackRate = pitchLevel
+        const apply = (el: HTMLAudioElement | null) => {
+            if (!el) return
+            el.playbackRate = effectivePitch
             // @ts-ignore
-            if (audioRef.current.mozPreservesPitch !== undefined) audioRef.current.mozPreservesPitch = false;
+            if (el.mozPreservesPitch !== undefined) el.mozPreservesPitch = false;
             // @ts-ignore
-            if (audioRef.current.webkitPreservesPitch !== undefined) audioRef.current.webkitPreservesPitch = false;
+            if (el.webkitPreservesPitch !== undefined) el.webkitPreservesPitch = false;
             // @ts-ignore
-            audioRef.current.preservesPitch = false;
+            el.preservesPitch = false;
         }
-    }, [pitchLevel])
+        apply(audioRef.current)
+        apply(bgAudioRef.current)
+    }, [effectivePitch])
 
     // Panning (L/R)
     useEffect(() => {
@@ -1714,7 +1724,7 @@ export default function MusicPlayer({ isActive, initialTracks, onRefreshTracks, 
         audio.load()
 
         // Re-apply pitch on every track load as it resets
-        audio.playbackRate = pitchLevel
+        audio.playbackRate = effectivePitch
 
         // Sync loop attribute for new track
         audio.loop = (repeatMode === 'one')
@@ -1729,7 +1739,7 @@ export default function MusicPlayer({ isActive, initialTracks, onRefreshTracks, 
             bg.src = track.fileUrl
             bg.preload = 'auto'
             bg.load()
-            bg.playbackRate = pitchLevel
+            bg.playbackRate = effectivePitch
             bg.loop = (repeatMode === 'one')
             if (isPlaying || shouldAutoPlayRef.current) {
                 shouldAutoPlayRef.current = false
@@ -2554,16 +2564,17 @@ export default function MusicPlayer({ isActive, initialTracks, onRefreshTracks, 
                                             style={{ '--slider-pct': `${distortLevel * 100}%` } as React.CSSProperties}
                                             onChange={(e) => { setDistortLevel(parseFloat(e.target.value)); markCustom() }} />
                                     </div>
-                                    <div className={`fx-control-group${isIOS ? ' fx-disabled' : ''}`}>
+                                    <div className="fx-control-group">
                                         <div className="fx-control-header">
                                             <label>Speed / Pitch</label>
-                                            <span className="fx-value">{isIOS ? 'N/A' : `${pitchLevel.toFixed(2)}x`}</span>
+                                            <span className="fx-value">{pitchLevel.toFixed(2)}x</span>
                                         </div>
-                                        <input type="range" className="fx-slider" min="0.25" max="3.0" step="0.01" value={isIOS ? 1 : pitchLevel}
+                                        <input type="range" className="fx-slider" min="0.25" max="3.0" step="0.01" value={pitchLevel}
                                             style={{ '--slider-pct': `${((pitchLevel - 0.25) / 2.75) * 100}%` } as React.CSSProperties}
-                                            disabled={isIOS}
                                             onChange={(e) => { setPitchLevel(parseFloat(e.target.value)); markCustom() }} />
-                                        {isIOS && <span className="fx-disabled-hint">Not supported on iOS</span>}
+                                        {isIOS && pitchLevel !== effectivePitch && (
+                                            <span className="fx-disabled-hint">iOS clamps to {effectivePitch.toFixed(2)}x</span>
+                                        )}
                                     </div>
                                 </div>
                             )}
