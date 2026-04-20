@@ -718,10 +718,11 @@ export default function MusicPlayer({ isActive, initialTracks, onRefreshTracks, 
     // Helper: Create a warmer reverb impulse — early reflections (so it
     // sounds like a space, not a noise burst), one-pole smoothing (rolls
     // off harsh highs), exponential decay tail. Sounds noticeably less
-    // metallic than raw white noise.
+    // metallic than raw white noise. iOS Safari chokes on long convolver
+    // buffers, so we shorten the tail there.
     const createReverbImpulse = (ctx: AudioContext) => {
-        const duration = 3.0
-        const decay = 2.5
+        const duration = isIOS ? 1.6 : 3.0
+        const decay = isIOS ? 2.0 : 2.5
         const sampleRate = ctx.sampleRate
         const length = Math.floor(sampleRate * duration)
         const impulse = ctx.createBuffer(2, length, sampleRate)
@@ -763,11 +764,24 @@ export default function MusicPlayer({ isActive, initialTracks, onRefreshTracks, 
         const ctx = new AudioContextClass(isIOS ? { sampleRate: 44100 } : undefined)
         audioContextRef.current = ctx
 
-        // iOS requires AudioContext resume on user gesture
+        // iOS requires AudioContext resume on user gesture. Try once now —
+        // in 99% of cases initAudioContext was triggered by a slider change
+        // which counts as a gesture. Fall back to a touchstart listener.
         if (ctx.state === 'suspended') {
-            const resumeCtx = () => { ctx.resume(); document.removeEventListener('touchstart', resumeCtx) }
-            document.addEventListener('touchstart', resumeCtx)
+            ctx.resume().catch(() => {
+                const resumeCtx = () => { ctx.resume(); document.removeEventListener('touchstart', resumeCtx) }
+                document.addEventListener('touchstart', resumeCtx, { once: true })
+            })
         }
+
+        // iOS quirk: createMediaElementSource on an already-playing element
+        // can drop the routing silently — the user hears the dry native
+        // pipeline and the AudioContext receives nothing. Pausing briefly
+        // before the createMediaElementSource call and resuming right after
+        // lets iOS rebind cleanly.
+        const wasPlaying = !audioRef.current.paused
+        const restoreTime = audioRef.current.currentTime
+        if (wasPlaying) audioRef.current.pause()
 
         // --- Create Nodes ---
         const source = ctx.createMediaElementSource(audioRef.current)
@@ -888,7 +902,13 @@ export default function MusicPlayer({ isActive, initialTracks, onRefreshTracks, 
         panner.pan.value = panningLevel
         distort.curve = makeDistortionCurve(distortLevel)
 
-        console.log("AudioFX: Simplified graph connected successfully")
+        // Restore playback now that the graph is wired up.
+        if (wasPlaying && audioRef.current) {
+            audioRef.current.currentTime = restoreTime
+            audioRef.current.play().catch(err => console.error('AudioFX: resume after init failed', err))
+        }
+
+        console.log("AudioFX: Graph connected. ctx.state =", ctx.state, "sampleRate =", ctx.sampleRate)
     }, [])
 
     // Initialize Audio Engine — only when an effect is actually used (not on first play)
@@ -901,7 +921,13 @@ export default function MusicPlayer({ isActive, initialTracks, onRefreshTracks, 
         if (hasActiveEffects && !audioContextRef.current && audioRef.current) {
             initAudioContext()
         }
-    }, [hasActiveEffects, initAudioContext])
+        // iOS routinely auto-suspends the AudioContext (UI scroll, hidden
+        // tab, etc.). Whenever the user toggles an effect we re-resume so
+        // the graph keeps producing audible signal.
+        if (hasActiveEffects && audioContextRef.current?.state === 'suspended') {
+            audioContextRef.current.resume().catch(() => {})
+        }
+    }, [hasActiveEffects, initAudioContext, bassLevel, reverbLevel, delayLevel, stereoWidthLevel, panningLevel, distortLevel])
 
     // iOS background audio: swap to bypass audio when AudioContext would be suspended
     useEffect(() => {
@@ -2490,6 +2516,22 @@ export default function MusicPlayer({ isActive, initialTracks, onRefreshTracks, 
                                 >{tab === 'eq' ? 'EQ' : tab.charAt(0).toUpperCase() + tab.slice(1)}</button>
                             ))}
                         </div>
+                        {audioContextRef.current && (
+                            <div style={{
+                                fontSize: '0.7rem',
+                                opacity: 0.5,
+                                textAlign: 'center',
+                                padding: '4px 0',
+                                color: audioContextRef.current.state === 'running' ? 'var(--accent-primary)' : '#ff5566',
+                            }}>
+                                FX engine: {audioContextRef.current.state}
+                                {' · '}{audioContextRef.current.sampleRate}Hz
+                                <button
+                                    style={{ marginLeft: 8, background: 'none', border: '1px solid currentColor', borderRadius: 4, padding: '0 6px', color: 'inherit', cursor: 'pointer', fontSize: '0.65rem' }}
+                                    onClick={() => audioContextRef.current?.resume().catch(() => {})}
+                                >resume</button>
+                            </div>
+                        )}
 
                         <div className="fx-tab-content">
                             {fxTab === 'tone' && (
