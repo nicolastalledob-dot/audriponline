@@ -3288,12 +3288,13 @@ textarea {
     left: 0;
     right: 0;
     z-index: 9999;
-    /* iOS standalone PWA sometimes reports safe-area-inset-bottom = 0
-       even when the home indicator is visible. max() guarantees a tiny
-       8px breathing room without bloating the bar on devices that
-       report a real inset. */
-    height: calc(54px + max(env(safe-area-inset-bottom, 0px), 8px));
-    padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
+    /* iOS standalone PWA frequently reports safe-area-inset-bottom = 0
+       even with the home indicator visible. The 24px floor ensures the
+       footer's frosted background reaches past the home indicator zone
+       all the way to the screen edge instead of stopping flush with the
+       last label baseline. */
+    height: calc(54px + max(env(safe-area-inset-bottom, 0px), 24px));
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 24px);
     background: var(--bg-frosted);
     backdrop-filter: blur(28px) saturate(180%);
     -webkit-backdrop-filter: blur(28px) saturate(180%);
