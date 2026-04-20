@@ -13,6 +13,18 @@ export default defineConfig({
             registerType: 'autoUpdate',
             workbox: {
                 globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+                // Take over open clients immediately and skip the "waiting"
+                // step so a new SW activates on the next page load instead
+                // of needing the user to fully close + reopen the PWA. iOS
+                // Safari is unforgiving about updates without this.
+                clientsClaim: true,
+                skipWaiting: true,
+                cleanupOutdatedCaches: true,
+                // Always go to the network for navigations so the user
+                // sees the latest HTML (which references the latest
+                // hashed JS/CSS). Cached HTML pinning to old assets is
+                // the #1 reason "my CSS changes didn't show up".
+                navigateFallback: null,
                 runtimeCaching: [
                     {
                         urlPattern: /^https:\/\/.*\.supabase\.co\/storage\/.*$/,
