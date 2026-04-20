@@ -33,14 +33,26 @@ export async function getTracks(_userId: string): Promise<Track[]> {
     return Promise.all((data ?? []).map(rowToTrack))
 }
 
+// In-memory cache so revisiting a track (esp. from lock-screen "next")
+// doesn't re-hit PostgREST for ~MB of base64 cover art.
+const coverArtCache = new Map<string, string | null>()
+
 export async function getTrackCoverArt(trackId: string): Promise<string | null> {
+    if (coverArtCache.has(trackId)) return coverArtCache.get(trackId)!
     const { data, error } = await api
         .from('tracks')
         .select('cover_art')
         .eq('id', trackId)
         .maybeSingle()
     if (error) throw error
-    return (data as any)?.cover_art ?? null
+    const art = (data as any)?.cover_art ?? null
+    coverArtCache.set(trackId, art)
+    return art
+}
+
+export function invalidateCoverArtCache(trackId?: string): void {
+    if (trackId) coverArtCache.delete(trackId)
+    else coverArtCache.clear()
 }
 
 export async function upsertTrack(
@@ -81,12 +93,14 @@ export async function upsertTrack(
         .select()
         .single()
     if (error) throw error
+    invalidateCoverArtCache(track.id)
     return rowToTrack(data)
 }
 
 export async function deleteTrack(trackId: string): Promise<void> {
     const { error } = await api.from('tracks').delete().eq('id', trackId)
     if (error) throw error
+    invalidateCoverArtCache(trackId)
     const session = await getSession()
     if (session) {
         fetch(`${AUDIO_URL}/delete/${trackId}`, {
@@ -113,6 +127,7 @@ export async function updateTrackMetadata(
         .select()
         .single()
     if (error) throw error
+    if (metadata.coverArt !== undefined) invalidateCoverArtCache(trackId)
     return rowToTrack(data)
 }
 

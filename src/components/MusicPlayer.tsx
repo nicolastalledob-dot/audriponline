@@ -883,6 +883,7 @@ export default function MusicPlayer({ isActive, initialTracks, onRefreshTracks, 
                     bgSwapRef.current = true
                     const bgAudio = new Audio()
                     bgAudio.crossOrigin = "anonymous"
+                    bgAudio.preload = "auto"
                     bgAudio.src = audioRef.current.src
                     bgAudio.currentTime = audioRef.current.currentTime
                     bgAudio.volume = audioRef.current.volume
@@ -1579,6 +1580,7 @@ export default function MusicPlayer({ isActive, initialTracks, onRefreshTracks, 
     useEffect(() => {
         const audio = new Audio()
         audio.crossOrigin = "anonymous"
+        audio.preload = "auto"
         audioRef.current = audio
 
         audio.addEventListener('timeupdate', () => {
@@ -1867,21 +1869,28 @@ export default function MusicPlayer({ isActive, initialTracks, onRefreshTracks, 
         if (newGlobalIndex !== -1) setCurrentTrackIndex(newGlobalIndex)
     }, [displayTracks, tracks, currentTrackIndex, isShuffle])
 
-    // Media Session API Support — use displayedArt (resolves async DB art)
+    // Media Session API Support — set title/artist/album immediately on
+    // track change; artwork updates separately when displayedArt resolves so
+    // the lock screen text doesn't lag waiting for the cover art fetch.
     useEffect(() => {
-        if ('mediaSession' in navigator && currentTrack) {
-            navigator.mediaSession.metadata = new MediaMetadata({
-                title: currentTrack.title,
-                artist: currentTrack.artist,
-                album: currentTrack.album,
-                artwork: displayedArt ? [
-                    { src: displayedArt, sizes: '96x96', type: 'image/jpeg' },
-                    { src: displayedArt, sizes: '256x256', type: 'image/jpeg' },
-                    { src: displayedArt, sizes: '512x512', type: 'image/jpeg' },
-                ] : []
-            })
-        }
-    }, [currentTrack, displayedArt])
+        if (!('mediaSession' in navigator) || !currentTrack) return
+        navigator.mediaSession.metadata = new MediaMetadata({
+            title: currentTrack.title,
+            artist: currentTrack.artist,
+            album: currentTrack.album,
+            artwork: [],
+        })
+    }, [currentTrack?.id, currentTrack?.title, currentTrack?.artist, currentTrack?.album])
+
+    useEffect(() => {
+        if (!('mediaSession' in navigator) || !navigator.mediaSession.metadata) return
+        if (!displayedArt) return
+        navigator.mediaSession.metadata.artwork = [
+            { src: displayedArt, sizes: '96x96', type: 'image/jpeg' },
+            { src: displayedArt, sizes: '256x256', type: 'image/jpeg' },
+            { src: displayedArt, sizes: '512x512', type: 'image/jpeg' },
+        ]
+    }, [displayedArt])
 
     // Update playback state for lock screen / Dynamic Island display
     useEffect(() => {
@@ -1930,6 +1939,40 @@ export default function MusicPlayer({ isActive, initialTracks, onRefreshTracks, 
         navigator.mediaSession.setActionHandler('previoustrack', handlePrevious)
         navigator.mediaSession.setActionHandler('nexttrack', handleNext)
     }, [handlePrevious, handleNext])
+
+    // Lock-screen scrubber position. Sync on track / duration / play state
+    // changes only — timeupdate fires too often to feed every tick.
+    useEffect(() => {
+        if (!('mediaSession' in navigator) || !currentTrack) return
+        const dur = Number.isFinite(duration) ? duration : 0
+        if (!dur) return
+        try {
+            navigator.mediaSession.setPositionState({
+                duration: dur,
+                position: Math.min(currentTime, dur),
+                playbackRate: audioRef.current?.playbackRate || 1,
+            })
+        } catch { /* setPositionState may throw on stale data */ }
+    }, [currentTrack?.id, duration, isPlaying])
+
+    // Prefetch the next track so a lock-screen "next" lands on a warm cache
+    // instead of a fresh fetch. Best-effort: 256 KB Range warms enough for
+    // the audio decoder to start, and getTrackCoverArt populates the in-memory
+    // art cache so MediaSession artwork pops instantly on switch.
+    useEffect(() => {
+        if (!currentTrack || displayTracks.length < 2) return
+        const idx = displayTracks.findIndex(t => t.id === currentTrack.id)
+        if (idx === -1) return
+        const nextTrack = displayTracks[(idx + 1) % displayTracks.length]
+        if (!nextTrack || nextTrack.id === currentTrack.id) return
+
+        const timer = setTimeout(() => {
+            fetch(nextTrack.fileUrl, { headers: { Range: 'bytes=0-262143' } }).catch(() => {})
+            db.getTrackCoverArt(nextTrack.id).catch(() => {})
+        }, 1500)
+
+        return () => clearTimeout(timer)
+    }, [currentTrack?.id, displayTracks])
 
     // No mini player in web version
 
